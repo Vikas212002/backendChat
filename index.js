@@ -20,34 +20,48 @@ connection().then(database => {
   server.listen(3000, () => {
     console.log('server running at http://localhost:3000');
   });
+}).catch(error => {
+  console.error("Failed to establish database connection:", error);
 });
 
 app.use(cors());
 
+let connectedUsers = {};
+
 io.on('connection', (socket) => {
   console.log('a user connected');
+  
+  // Replace socket.id with a user identifier
+  const userId = socket.handshake.query.userId;
+  connectedUsers[userId] = socket.id; 
+  io.emit('active-status', { connectedUsers }); // Broadcast active status to all clients
+  console.log(connectedUsers);  
 
-  socket.on('joinRoom', ({ sender, receiver }) => {
+  socket.on('joinRoom', async ({ sender, receiver }) => {
     const roomId = [sender, receiver].sort().join('_');
+    console.log(`User ${sender} joined room: ${roomId}`);
     socket.join(roomId);
 
-    // Fetch previous messages
-    const collectionName = db.collection('messages');
-    collectionName.find({ roomId }).toArray((err, messages) => {
-      if (err) throw err;
-      socket.emit('previousMessages', messages);
-    });
+    try {
+      const messages = await db.collection('messages').find({ roomId }).sort({ timestamp: 1 }).toArray();
+      socket.emit("previousMessages", messages);
+    } catch (err) {
+      console.log(err);
+    }
   });
 
-  socket.on('chat message', async ({ msg, roomId }) => {
-    io.to(roomId).emit('chat message', msg);
-    console.log('message: ' + msg);
+  socket.on('chat message', async ({ msg, roomId, sender, receiver }) => {
+    const messageObject = { msg, sender };
+    io.to(roomId).emit('chat message', messageObject);
+    console.log(`message from ${sender} to ${receiver}: ${msg}`);
 
     try {
       const newChat = {
+        sender: sender,
+        receiver: receiver,
         message: msg,
         timestamp: Date.now(),
-        roomId
+        roomId: roomId
       };
       const collectionName = db.collection('messages');
       const insert = await collectionName.insertOne(newChat);
@@ -61,5 +75,8 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('user disconnected');
+    delete connectedUsers[userId]; // Remove user from connected users
+    io.emit('disconnection', { connectedUsers }); // Notify all clients of disconnection
   });
 });
+
