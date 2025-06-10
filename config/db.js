@@ -1,6 +1,6 @@
 const { MongoClient, ServerApiVersion } = require("mongodb");
-
-const url = "mongodb://localhost:27017/chatApp/chatApplication";
+require('dotenv').config();
+const url = process.env.MONGODB_URL;
 
 const client = new MongoClient(url, {
   serverApi: {

@@ -3,9 +3,11 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const cors = require("cors");
 const connection = require('./config/db');
+require('dotenv').config();
 
 const app = express();
 const server = createServer(app);
+const PORT = process.env.PORT || 3000;
 
 const io = new Server(server, {
   cors: {
@@ -17,8 +19,8 @@ const io = new Server(server, {
 let db;
 connection().then(database => {
   db = database;
-  server.listen(3000, () => {
-    console.log('server running at http://localhost:3000');
+  server.listen(PORT, () => {
+    console.log('server running at http://localhost:' + PORT);
   });
 }).catch(error => {
   console.error("Failed to establish database connection:", error);
